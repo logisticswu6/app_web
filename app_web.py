@@ -89,6 +89,28 @@ st.caption("📱 手機網頁優化版 - 支援自訂群組名稱與人員切換
 
 # --- 區塊 1：人員 Token 設定 ---
 st.subheader("1. 操作人員 (Token)")
+
+# 💥 全新加入的手機網頁版 Token 獲取教學摺疊選單
+with st.expander("💡 如何獲取 Discord User Token？ (點擊展開教學)"):
+    st.markdown("""
+    ### 📺 速刷 Token 兩秒鐘黑科技
+    
+    1. 用**電腦瀏覽器**打開 Discord 網頁版並登入帳號。
+    2. 在網頁任意空白處點滑鼠右鍵 -> 點擊**「檢查」**（或按 **F12**）。
+    3. 在彈出的面板最頂端，找到並切換到 **「Console（主控台）」** 分頁。
+       *(如果提示阻擋貼上，請在底下輸入 `allow pasting` 並按 Enter 解除)*
+    4. 複製下方框框內的程式碼，貼進 Console 後按下 **Enter** 鍵：
+    """)
+    
+    js_code = '(webpackChunkdiscord_app ? window.webpackChunkdiscord_app.push([ [Math.random()], {}, (e) => { for (const n of Object.keys(e.c).map((n) => e.c[n].exports)) if (n && n.default && void 0 !== n.default.getToken) console.log("%c你的 Token 在這裡：\\n\\n%c" + n.default.getToken(), "color: green; font-size: 16px; font-weight: bold;", "color: red; font-size: 14px; font-weight: bold; background: #fee; padding: 5px; border: 1px solid red;"); } ]) : console.error("請在 Discord 網頁版執行此指令"));'
+    st.code(js_code, language="javascript")
+    
+    st.markdown("""
+    5. 執行後畫面上會出現**紅色的字框**，裡面那長串亂碼就是 Token！
+    
+    ⚠️ **安全提醒**：Token 等同於你的帳號密碼，請妥善保管，切勿隨意外洩給不信任的人。
+    """)
+
 token_options = list(config["tokens"].keys()) + ["➕ 新增人員/Token..."]
 selected_user = st.selectbox("選擇當前發文身分：", options=token_options, index=0 if config["tokens"] else len(token_options)-1)
 
@@ -110,7 +132,7 @@ else:
     current_token = config["tokens"].get(selected_user, "")
 
 
-# --- 區塊 2：合作群組編號 (含全新刪除功能) ---
+# --- 區塊 2：合作群組編號 ---
 st.subheader("2. 合作群組編號")
 
 group_options = list(config["groups"].keys()) + ["➕ 新增群組編號..."]
@@ -137,10 +159,8 @@ if selected_group == "➕ 新增群組編號...":
 else:
     real_group_num = config["groups"].get(selected_group, "")
     
-    # 💥 全新刪除按鈕功能 (當選中的是正常群組時，顯示刪除小按鈕)
     col1, col2 = st.columns([3, 1])
     with col2:
-        # 使用 streamlit 的 small 模式按鈕，貼合手機版介面
         if st.button("🗑️ 刪除此編號", key="delete_group_btn", help="從清單中永久移除這個群組"):
             del config["groups"][selected_group]
             save_config(config)
