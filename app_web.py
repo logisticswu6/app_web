@@ -3,25 +3,31 @@ import requests
 import json
 import time
 
-# 設定網頁標題
-st.set_page_config(page_title="Discord 發文助手 (雲端同步網頁版)", page_icon="🚀", layout="centered")
+st.set_page_config(page_title="Discord 發文助手 (歷史訊息覆蓋修正版)", page_icon="🚀", layout="centered")
 
 # ==================== 🛠️ 雲端資料庫設定區 ====================
-# 請在下方雙引號內填入你在 JSONBin.io 取得的金鑰與資料庫 ID
 JSONBIN_API_KEY = "$2a$10$Ra1BhjITYBEhe1ggEvr3o.wMqppUZSYG.IffOOpli7EWDah1OnumC"  # 填入你的 Master Key
 JSONBIN_BIN_ID = "6a11c2ce6610dd3ae892a792"       # 填入你的 Bin ID
 # ==========================================================
 
-# 自訂按鈕樣式
 st.markdown("<style>div.stButton > button:first-child { width: 100%; height: 50px; font-size: 18px !important; font-weight: bold; }</style>", unsafe_allow_html=True)
 
-# --- JSONBin 雲端讀寫邏輯 ---
 def load_cloud_config():
     headers = {"X-Master-Key": JSONBIN_API_KEY}
     try:
         res = requests.get(f"https://api.jsonbin.io/v3/b/{JSONBIN_BIN_ID}/latest", headers=headers)
         if res.status_code == 200:
-            return res.json().get("record", {})
+            data = res.json().get("record", {})
+            # 資料相容性檢查結構
+            raw_groups = data.get("groups", {})
+            cleaned_groups = {}
+            for k, v in raw_groups.items():
+                if isinstance(v, dict):
+                    cleaned_groups[k] = v
+                else:
+                    cleaned_groups[k] = {"group_num": str(v), "message_id": ""}
+            data["groups"] = cleaned_groups
+            return data
     except:
         pass
     return {"tokens": {}, "groups": {}, "user_id": ""}
@@ -31,40 +37,19 @@ def save_cloud_config(data):
     try:
         requests.put(f"https://api.jsonbin.io/v3/b/{JSONBIN_BIN_ID}", json=data, headers=headers)
     except:
-        st.error("雲端資料庫寫入失敗，請檢查網路！")
+        st.error("雲端資料庫寫入失敗！")
 
-# 檢查設定
 if "XXX" in JSONBIN_API_KEY or "XXX" in JSONBIN_BIN_ID:
-    st.error("❌ 請先在程式碼最上方填入有效的 JSONBIN_API_KEY 和 JSONBIN_BIN_ID！")
+    st.error("❌ 請先填寫程式碼最上方的 JSONBin 設定欄位！")
     st.stop()
 
-# 讀取雲端資料
 if 'cloud_config' not in st.session_state:
     st.session_state.cloud_config = load_cloud_config()
 
 config = st.session_state.cloud_config
 
-# --- Discord 雙發送邏輯 ---
-def post_to_discord(token, group_num, user_id, content):
-    channel_id = "1278344397808996454"
-    url = f"https://discord.com/api/v9/channels/{channel_id}/messages"
-    headers = {"Authorization": token, "Content-Type": "application/json"}
-    final_text = f"太屌了 這是本群第{group_num}個合作群組\n<@&1277926068891684946>\n代表: <@{user_id}>\n{content}"
-    try:
-        res = requests.post(url, json={"content": "<@&1277926068891684946>"}, headers=headers)
-        if res.status_code == 200:
-            msg_id = res.json().get("id")
-            time.sleep(0.3)
-            requests.patch(f"{url}/{msg_id}", json={"content": final_text}, headers=headers)
-            return True, "發送成功，且已強制觸發通知！"
-        return False, f"發送失敗，錯誤代碼: {res.status_code}"
-    except Exception as e:
-        return False, str(e)
+st.title("🚀 Discord 發文助手 (覆蓋修正版)")
 
-# --- UI 介面 ---
-st.title("🚀 Discord 發文助手 (雲端同步版)")
-
-# 手動同步刷新按鈕
 if st.button("🔄 同步/刷新雲端最新資料"):
     st.session_state.cloud_config = load_cloud_config()
     st.rerun()
@@ -72,7 +57,6 @@ if st.button("🔄 同步/刷新雲端最新資料"):
 # 1. 操作人員
 st.subheader("1. 操作人員 (Token)")
 with st.expander("💡 如何獲取 Discord User Token？"):
-    st.markdown("1. 電腦網頁版 Discord 按 F12 -> Console。\n2. 複製下方代碼貼上按 Enter：")
     js_code = '(webpackChunkdiscord_app ? window.webpackChunkdiscord_app.push([ [Math.random()], {}, (e) => { for (const n of Object.keys(e.c).map((n) => e.c[n].exports)) if (n && n.default && void 0 !== n.default.getToken) console.log("%c你的 Token 在這裡：\\n\\n%c" + n.default.getToken(), "color: green; font-size: 16px; font-weight: bold;", "color: red; font-size: 14px; font-weight: bold; background: #fee; padding: 5px; border: 1px solid red;"); } ]) : console.error("請在 Discord 網頁版執行此指令"));'
     st.code(js_code, language="javascript")
 
@@ -89,14 +73,12 @@ if selected_user == "➕ 新增人員/Token...":
                 config["tokens"][name.strip()] = tk_val.strip()
                 save_cloud_config(config)
                 st.success("已同步至雲端選單！")
-                st.session_state.cloud_config = config
                 st.rerun()
 else:
     current_token = config["tokens"].get(selected_user, "")
     if selected_user and st.button("🗑️ 刪除此人員", key="del_u"):
         del config["tokens"][selected_user]
         save_cloud_config(config)
-        st.session_state.cloud_config = config
         st.rerun()
 
 # 2. 合作群組編號
@@ -104,7 +86,7 @@ st.subheader("2. 合作群組編號")
 group_options = list(config["groups"].keys()) + ["➕ 新增群組編號..."]
 selected_group = st.selectbox("選擇合作群組編號：", options=group_options)
 
-real_group_num = ""
+g_data = {}
 if selected_group == "➕ 新增群組編號...":
     with st.form("add_group", clear_on_submit=True):
         num = st.text_input("群組編號數字：")
@@ -112,17 +94,15 @@ if selected_group == "➕ 新增群組編號...":
         if st.form_submit_button("💾 儲存群組編號"):
             if num.strip():
                 display_name = g_name.strip() if g_name.strip() else num.strip()
-                config["groups"][display_name] = num.strip()
+                config["groups"][display_name] = {"group_num": num.strip(), "message_id": ""}
                 save_cloud_config(config)
                 st.success("已同步至雲端選單！")
-                st.session_state.cloud_config = config
                 st.rerun()
 else:
-    real_group_num = config["groups"].get(selected_group, "")
+    g_data = config["groups"].get(selected_group, {})
     if selected_group and st.button("🗑️ 刪除此編號", key="del_g"):
         del config["groups"][selected_group]
         save_cloud_config(config)
-        st.session_state.cloud_config = config
         st.rerun()
 
 # 3. 內文填寫
@@ -130,10 +110,46 @@ st.subheader("3. 發文內容填寫")
 user_id = st.text_input("代表使用者 ID：", value=config.get("user_id", ""))
 content = st.text_area("文宣內容：", height=150)
 
-if st.button("🚀 立即發送 (強制通知)"):
-    if current_token and real_group_num and user_id.strip() and content.strip():
+if st.button("🚀 提交發送 / 覆蓋修正"):
+    if current_token and g_data and user_id.strip() and content.strip():
         config["user_id"] = user_id.strip()
-        save_cloud_config(config)
-        success, msg = post_to_discord(current_token, real_group_num, user_id.strip(), content.strip())
-        if success: st.success(msg)
-        else: st.error(msg)
+        
+        num = g_data.get("group_num")
+        msg_id = g_data.get("message_id", "")
+        
+        channel_id = "1278344397808996454"
+        base_url = f"https://discord.com/api/v9/channels/{channel_id}/messages"
+        headers = {"Authorization": current_token, "Content-Type": "application/json"}
+        final_text = f"太屌了 這是本群第{num}個合作群組\n<@&1277926068891684946>\n代表: <@{user_id.strip()}>\n{content.strip()}"
+        
+        # 💥 網頁版核心歷史判定：有舊 ID 直接執行 PATCH 修正
+        if msg_id:
+            try:
+                edit_res = requests.patch(f"{base_url}/{msg_id}", json={"content": final_text}, headers=headers)
+                if edit_res.status_code == 200:
+                    save_cloud_config(config)
+                    st.success("🎯 偵測到群組歷史！已成功為您遠端更正原訊息內容，未發送新訊息。")
+                elif edit_res.status_code == 404:
+                    msg_id = "" # 原貼文不見了，直接往下遞補重發
+                else:
+                    st.error(f"覆蓋修正失敗: {edit_res.text}")
+            except Exception as e:
+                st.error(f"連線異常: {e}")
+                
+        # 執行首次新貼文發送
+        if not msg_id:
+            try:
+                res = requests.post(base_url, json={"content": "<@&1277926068891684946>"}, headers=headers)
+                if res.status_code == 200:
+                    new_id = res.json().get("id")
+                    time.sleep(0.3)
+                    requests.patch(f"{base_url}/{new_id}", json={"content": final_text}, headers=headers)
+                    
+                    config["groups"][selected_group]["message_id"] = new_id
+                    save_cloud_config(config)
+                    st.success("🆕 新編號首次發布成功！已自動鎖定訊息 ID 至雲端。")
+                    st.rerun()
+                else:
+                    st.error(f"發送失敗: {res.text}")
+            except Exception as e:
+                st.error(str(e))
