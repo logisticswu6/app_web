@@ -87,6 +87,10 @@ def post_to_discord(token, group_num, user_id, content):
 st.title("🚀 Discord 發文助手")
 st.caption("📱 手機網頁優化版 - 支援自訂群組名稱與人員切換")
 
+# --- 增加刷新按鈕 ---
+if st.button("🔄 重新讀取雲端資料 / 刷新頁面"):
+    st.rerun() # 這會強制網頁重新執行一次整個程式，重新讀取 config.json
+
 # --- 區塊 1：人員 Token 設定 (含全新刪除功能) ---
 st.subheader("1. 操作人員 (Token)")
 
