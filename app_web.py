@@ -87,10 +87,9 @@ def post_to_discord(token, group_num, user_id, content):
 st.title("🚀 Discord 發文助手")
 st.caption("📱 手機網頁優化版 - 支援自訂群組名稱與人員切換")
 
-# --- 區塊 1：人員 Token 設定 ---
+# --- 區塊 1：人員 Token 設定 (含全新刪除功能) ---
 st.subheader("1. 操作人員 (Token)")
 
-# 💥 全新加入的手機網頁版 Token 獲取教學摺疊選單
 with st.expander("💡 如何獲取 Discord User Token？ (點擊展開教學)"):
     st.markdown("""
     ### 📺 速刷 Token 兩秒鐘黑科技
@@ -130,6 +129,16 @@ if selected_user == "➕ 新增人員/Token...":
                 st.warning("名稱與 Token 不可為空！")
 else:
     current_token = config["tokens"].get(selected_user, "")
+    
+    # 💥 全新加入的人員刪除按鈕
+    u_col1, u_col2 = st.columns([3, 1])
+    with u_col2:
+        if st.button("🗑️ 刪除此人員", key="delete_user_btn", help="從清單中永久移除這個人員"):
+            del config["tokens"][selected_user]
+            save_config(config)
+            st.toast(f"🛑 已成功移除操作人員：{selected_user}")
+            time.sleep(0.5)
+            st.rerun()
 
 
 # --- 區塊 2：合作群組編號 ---
@@ -159,8 +168,8 @@ if selected_group == "➕ 新增群組編號...":
 else:
     real_group_num = config["groups"].get(selected_group, "")
     
-    col1, col2 = st.columns([3, 1])
-    with col2:
+    g_col1, g_col2 = st.columns([3, 1])
+    with g_col2:
         if st.button("🗑️ 刪除此編號", key="delete_group_btn", help="從清單中永久移除這個群組"):
             del config["groups"][selected_group]
             save_config(config)
