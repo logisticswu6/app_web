@@ -3,10 +3,8 @@ import requests, json
 from cryptography.fernet import Fernet
 
 SECRET_KEY = b'sRD5V2HljbhBgexgGZfPD_bF_UqYbp1JGHQzLmeaiAE='
-
 def load_s():
-    with open("config.bin", "rb") as f:
-        return json.loads(Fernet(SECRET_KEY).decrypt(f.read()).decode())
+    with open("config.bin", "rb") as f: return json.loads(Fernet(SECRET_KEY).decrypt(f.read()).decode())
 
 s = load_s()
 st.markdown('<meta http-equiv="refresh" content="20">', unsafe_allow_html=True)
@@ -17,8 +15,6 @@ u = st.selectbox("人員", list(config["tokens"].keys()))
 g = st.selectbox("群組", list(config["groups"].keys()))
 uid = st.text_input("User ID", value=config.get("user_id", ""))
 txt = st.text_area("文宣內容")
-
-if st.button("🔄 手動同步"): st.rerun()
 
 if st.button("🚀 提交 / 修正"):
     g_d = config["groups"][g]
