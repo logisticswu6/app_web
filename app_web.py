@@ -8,7 +8,7 @@ CONFIG_FILE = "config.json"
 
 # 設定網頁標題與外觀（針對手機版優化）
 st.set_page_config(
-    page_title="Discord 個人發文助手 (自訂編號版)",
+    page_title="Discord 個人發文助手 (完整管理版)",
     page_icon="🚀",
     layout="centered"
 )
@@ -31,7 +31,7 @@ def load_config():
         try:
             with open(CONFIG_FILE, "r", encoding="utf-8") as f:
                 config = json.load(f)
-                # 相容性轉換：如果舊格式的 groups 是列表，自動轉換為新的字典格式
+                # 相容性轉換
                 if isinstance(config.get("groups"), list):
                     new_groups = {g: g for g in config["groups"]}
                     config["groups"] = new_groups
@@ -62,11 +62,9 @@ def post_to_discord(token, group_num, user_id, content):
         "Content-Type": "application/json"
     }
     
-    # 組合最終文宣（這裡的 group_num 會是純數字的編號）
     final_text = f"太屌了 這是本群第{group_num}個合作群組\n<@&1277926068891684946>\n代表: <@{user_id}>\n{content}"
     
     try:
-        # 第一步：首發「純身分組標籤訊息」，100% 炸出手機跳窗與音效通知
         trigger_payload = {"content": "<@&1277926068891684946>"}
         response = requests.post(url, json=trigger_payload, headers=headers)
         
@@ -75,7 +73,6 @@ def post_to_discord(token, group_num, user_id, content):
             msg_id = msg_data.get("id")
             
             if msg_id:
-                # 第二步：毫秒級無縫編輯替換成完整的精美文宣內容
                 time.sleep(0.3)
                 edit_url = f"https://discord.com/api/v9/channels/{channel_id}/messages/{msg_id}"
                 edit_response = requests.patch(edit_url, json={"content": final_text}, headers=headers)
@@ -112,8 +109,10 @@ if selected_user == "➕ 新增人員/Token...":
 else:
     current_token = config["tokens"].get(selected_user, "")
 
-# --- 區塊 2：合作群組編號 ---
+
+# --- 區塊 2：合作群組編號 (含全新刪除功能) ---
 st.subheader("2. 合作群組編號")
+
 group_options = list(config["groups"].keys()) + ["➕ 新增群組編號..."]
 selected_group = st.selectbox("選擇合作群組編號：", options=group_options, index=0 if config["groups"] else len(group_options)-1)
 
@@ -121,16 +120,14 @@ real_group_num = ""
 if selected_group == "➕ 新增群組編號...":
     with st.form("add_group_form", clear_on_submit=True):
         new_group_num = st.text_input("1. 輸入群組編號數字 (必填，例如: 125)：")
-        new_group_name = st.text_input("2. 設定對象名稱 (選填，例如: 旭日物流。留空則預設顯示編號)：")
+        new_group_name = st.text_input("2. 設定對象名稱 (選填，留空則預設顯示編號)：")
         submit_group = st.form_submit_button("💾 儲存群組編號")
         if submit_group:
             num_clean = new_group_num.strip()
             name_clean = new_group_name.strip()
             
             if num_clean:
-                # 如果沒有填寫名稱，則直接用「編號號碼」當作顯示選項
                 display_name = name_clean if name_clean else num_clean
-                
                 config["groups"][display_name] = num_clean
                 save_config(config)
                 st.success(f"成功新增群組「{display_name}」！")
@@ -138,8 +135,19 @@ if selected_group == "➕ 新增群組編號...":
             else:
                 st.warning("群組編號數字不可為空！")
 else:
-    # 這裡會抓到選單名稱對應的「純數字編號」
     real_group_num = config["groups"].get(selected_group, "")
+    
+    # 💥 全新刪除按鈕功能 (當選中的是正常群組時，顯示刪除小按鈕)
+    col1, col2 = st.columns([3, 1])
+    with col2:
+        # 使用 streamlit 的 small 模式按鈕，貼合手機版介面
+        if st.button("🗑️ 刪除此編號", key="delete_group_btn", help="從清單中永久移除這個群組"):
+            del config["groups"][selected_group]
+            save_config(config)
+            st.toast(f"🛑 已成功移除群組：{selected_group}")
+            time.sleep(0.5)
+            st.rerun()
+
 
 # --- 區塊 3：代表 ID 與文宣 ---
 st.subheader("3. 發文內容填寫")
@@ -156,11 +164,9 @@ if st.button("🚀 立即發送 (強制震動通知)"):
     elif not user_id.strip() or not content.strip():
         st.error("代表使用者 ID 與文宣內容不可以空著！")
     else:
-        # 記憶最後一次輸入的 user_id
         config["user_id"] = user_id.strip()
         save_config(config)
         
-        # 執行雙發送頂替發文
         with st.spinner("正在執行雙發送頂替法... 強制震動通知中..."):
             success, msg = post_to_discord(current_token, real_group_num, user_id.strip(), content.strip())
             if success:
